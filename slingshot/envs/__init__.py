@@ -1,0 +1,2 @@
+from gym_slingshot.envs.slingshot_env import SlingshotEnv
+from gym_slingshot.envs.slingshot_extrahard_env import SlingshotExtraHardEnv

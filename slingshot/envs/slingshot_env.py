@@ -5,10 +5,13 @@ from gym.utils import seeding
 ####################
 import random
 import math
+import pyglet
+
+from pyglet_test import MyWindow
 ####################
-FRAME_WIDTH = 20.0
-FRAME_HEIGHT = 10.0
-ROCKET_SPAWN_BOUNDARY_X = 0.1
+FRAME_WIDTH = 1000
+FRAME_HEIGHT = 800
+# ROCKET_SPAWN_BOUNDARY_X = 0.1
 ROCKET_SPAWN_BOUNDARY_Y_TOP = 0.8
 ROCKET_SPAWN_BOUNDARY_Y_BOT = 0.2
 TARGET_SPAWN_BOUNDARY_X = 0.9
@@ -23,15 +26,17 @@ MAX_STEPS = 200
 MAX_INIT_SPEED = 1.0/(2 * MAX_STEPS)
 MAX_INIT_ANGLE = math.pi / 6
 SPEED_FACTOR = 20  # Km/s
-ROCKET_ACC = 0.02  # km/s^2
+ROCKET_ACC = 1e-7  # km/s^2
 ROCKET_ROT_ANGLE = math.pi / 6
+
+NO_TOUCHING_ZONE_RADIUS = 0.05
 
 FUEL_COST = -1
 TURN_COST = -0.1
 
-STEP_DURATION = 3600  # Seconds
-GRAVITY_CONSTANT = 6.674 * 10 ** (-20)  # km^3 / (kg s^2)
-DISTANCE_FACTOR = SPEED_FACTOR / MAX_INIT_SPEED * STEP_DURATION
+STEP_DURATION = 3600  # Seconds / tick
+GRAVITY_CONSTANT = 6.674 * 10 ** (-19)  # km^3 / (kg s^2)
+DISTANCE_FACTOR = SPEED_FACTOR * STEP_DURATION
 
 
 class SlingshotEnv(gym.Env):
@@ -49,7 +54,7 @@ class SlingshotEnv(gym.Env):
       self.planet_x = random.uniform(PLANET_SPAWN_BOUNDARY_X_LEFT, PLANET_SPAWN_BOUNDARY_X_RIGHT)
       self.planet_y = random.uniform(PLANET_SPAWN_BOUNDARY_Y_BOT, PLANET_SPAWN_BOUNDARY_Y_TOP)
       self.planet_m = random.uniform(PLANET_MIN_MASS, PLANET_MAX_MASS)
-      self.rocket_x = random.uniform(0, ROCKET_SPAWN_BOUNDARY_X)
+      self.rocket_x = 0.0
       self.rocket_y = random.uniform(ROCKET_SPAWN_BOUNDARY_Y_BOT, ROCKET_SPAWN_BOUNDARY_Y_TOP)
       speed = random.uniform(0, MAX_INIT_SPEED)
       self.rocket_angle = random.uniform(-MAX_INIT_ANGLE, MAX_INIT_ANGLE)
@@ -86,7 +91,7 @@ class SlingshotEnv(gym.Env):
     self.update_position(action)
     done = self.is_done()
     reward = self.calculate_reward(action, done)
-    distance = math.sqrt((self.target_x - self.rocket_x)**2 + (self.target_y - self.target_y)**2) 
+    distance = math.sqrt((self.target_x - self.rocket_x)**2 + (self.target_y - self.rocket_y)**2) 
     if distance < self.min_distance:
       self.min_distance = distance
     
@@ -96,7 +101,7 @@ class SlingshotEnv(gym.Env):
     delta_x = (self.planet_x - self.rocket_x)
     delta_y = (self.planet_y - self.rocket_y)
     r_p = math.sqrt(delta_x**2 + delta_y**2) * DISTANCE_FACTOR
-    a_of_g = 0  # GRAVITY_CONSTANT * self.planet_m / (r_p**2) # km / s^2
+    a_of_g = GRAVITY_CONSTANT * self.planet_m / (r_p**2) # km / s^2
     a_of_g_x = a_of_g * delta_x / r_p
     a_of_g_y = a_of_g * delta_y / r_p
     a_of_t = ROCKET_ACC * action[0]
@@ -115,6 +120,8 @@ class SlingshotEnv(gym.Env):
     self.rocket_vel_x = self.rocket_vel_x + a_x * STEP_DURATION / SPEED_FACTOR
     self.rocket_vel_y = self.rocket_vel_y + a_y * STEP_DURATION / SPEED_FACTOR
     self.rocket_angle = final_angle
+    self.acc_x = a_x
+    self.acc_y = a_y
 
   def get_obs(self):
     return (self.rocket_x, self.rocket_y, self.rocket_vel_x, 
@@ -122,17 +129,21 @@ class SlingshotEnv(gym.Env):
             self.target_x, self.target_y)
 
   def is_done(self):
+    radius_planet = math.sqrt((self.rocket_x - self.planet_x) ** 2 + (self.rocket_y - self.planet_y)**2)
     if self.rocket_x > 1 or self.rocket_x < 0:
       return True
     elif self.rocket_y > 1 or self.rocket_y < 0:
       return True
     elif self.time_step > MAX_STEPS:
       return True
+    elif radius_planet < NO_TOUCHING_ZONE_RADIUS:
+      print("Entered No touching zone")
+      return True
     else:
       return False
 
   def calculate_reward(self, actions, done):
-    reward = actions[0] * FUEL_COST + actions[1] * TURN_COST
+    reward = abs(actions[0]) * FUEL_COST + abs(actions[1]) * TURN_COST
 
     if done:
       reward += 200/(1+100*self.min_distance) - 2
@@ -150,3 +161,36 @@ class SlingshotEnv(gym.Env):
 
 
 env = SlingshotEnv()
+state = env.reset()
+positions = []
+print(state)
+print(env.rocket_angle)
+for i in range(10000):
+  positions.append(int(state[0] * FRAME_WIDTH))
+  positions.append(int(state[1] * FRAME_HEIGHT))
+  if env.rocket_angle > 0.1:
+    state, reward, done, _ = env.step((0.5, -0.1))
+    # print("turn up")
+  elif env.rocket_angle < 0:
+    state, reward, done, _ = env.step((0.0, 0.1))
+    # print("turn down")
+  else:
+    state, reward, done, _ = env.step((1, 0))
+    # print("turn up")
+  print(env.rocket_angle, reward)
+  if done:
+    print("Iter", i)
+    print("Vel: ", env.rocket_vel_x, env.rocket_vel_y)
+    print("Acc: ", env.acc_x, env.acc_y)
+    break 
+
+
+if __name__ == '__main__':
+  window = MyWindow(FRAME_WIDTH, FRAME_HEIGHT)
+  window.update_points(positions)
+  window.set_planet(int(env.planet_x * FRAME_WIDTH), int(env.planet_y * FRAME_HEIGHT))
+  window.set_target(int(env.target_x * FRAME_WIDTH), int(env.target_y * FRAME_HEIGHT))
+  print(int(env.planet_x * FRAME_WIDTH), int(env.planet_y * FRAME_HEIGHT))
+  pyglet.app.run()
+
+  

@@ -6,8 +6,10 @@ from gym.utils import seeding
 import random
 import math
 import pyglet
-
-from .pyglet_test import MyWindow
+from pyglet.gl import *
+import time
+from pyglet_test import MyWindow
+from newpyglet import main
 ####################
 FRAME_WIDTH = 1000
 FRAME_HEIGHT = 800
@@ -48,20 +50,9 @@ class SlingshotEnv(gym.Env):
       All positions are relative to frame i.e. [0,1] X [0,1] where (0,0) indicates top 
       left corner and (1,1) indicates bottom right corner
       """
-
-      self.target_x = random.uniform(TARGET_SPAWN_BOUNDARY_X, 1)
-      self.target_y = random.uniform(0, 1)
-      self.planet_x = random.uniform(PLANET_SPAWN_BOUNDARY_X_LEFT, PLANET_SPAWN_BOUNDARY_X_RIGHT)
-      self.planet_y = random.uniform(PLANET_SPAWN_BOUNDARY_Y_BOT, PLANET_SPAWN_BOUNDARY_Y_TOP)
-      self.planet_m = random.uniform(PLANET_MIN_MASS, PLANET_MAX_MASS)
-      self.rocket_x = 0.0
-      self.rocket_y = random.uniform(ROCKET_SPAWN_BOUNDARY_Y_BOT, ROCKET_SPAWN_BOUNDARY_Y_TOP)
-      speed = random.uniform(0, MAX_INIT_SPEED)
-      self.rocket_angle = random.uniform(-MAX_INIT_ANGLE, MAX_INIT_ANGLE)
-      self.rocket_vel_x = speed * math.cos(self.rocket_angle)
-      self.rocket_vel_y = speed * math.sin(self.rocket_angle)
-      self.min_distance = math.sqrt((self.target_x - self.rocket_x)**2 + (self.target_y - self.target_y)**2) 
-      self.time_step = 0
+      self.reset()
+      self.x = main(FRAME_WIDTH, FRAME_HEIGHT)
+      self.positions = []
 
   def step(self, action):
     """
@@ -150,14 +141,32 @@ class SlingshotEnv(gym.Env):
     return reward
 
   def reset(self):
-    self.__init__()
+    self.target_x = random.uniform(TARGET_SPAWN_BOUNDARY_X, 1)
+    self.target_y = random.uniform(0, 1)
+    self.planet_x = random.uniform(PLANET_SPAWN_BOUNDARY_X_LEFT, PLANET_SPAWN_BOUNDARY_X_RIGHT)
+    self.planet_y = random.uniform(PLANET_SPAWN_BOUNDARY_Y_BOT, PLANET_SPAWN_BOUNDARY_Y_TOP)
+    self.planet_m = random.uniform(PLANET_MIN_MASS, PLANET_MAX_MASS)
+    self.rocket_x = 0.0
+    self.rocket_y = random.uniform(ROCKET_SPAWN_BOUNDARY_Y_BOT, ROCKET_SPAWN_BOUNDARY_Y_TOP)
+    speed = random.uniform(0, MAX_INIT_SPEED)
+    self.rocket_angle = random.uniform(-MAX_INIT_ANGLE, MAX_INIT_ANGLE)
+    self.rocket_vel_x = speed * math.cos(self.rocket_angle)
+    self.rocket_vel_y = speed * math.sin(self.rocket_angle)
+    self.min_distance = math.sqrt((self.target_x - self.rocket_x) ** 2 + (self.target_y - self.target_y) ** 2)
+    self.time_step = 0
     return self.get_obs()
 
   def render(self, mode='human'):
-    pass
+    self.positions.append(int(self.rocket_x*FRAME_WIDTH))
+    self.positions.append(int(self.rocket_y*FRAME_HEIGHT))
+    self.x.render(self.positions[-2], self.positions[-1], self.rocket_angle, self.planet_x * FRAME_WIDTH,
+                  self.planet_y * FRAME_HEIGHT, self.target_x * FRAME_WIDTH, self.target_y * FRAME_HEIGHT,
+                  self.positions, 1)
+    event = self.x.dispatch_events()
 
   def close(self):
     pass
+
 
 if __name__ == '__main__':
   env = SlingshotEnv()
@@ -165,31 +174,22 @@ if __name__ == '__main__':
   positions = []
   print(state)
   print(env.rocket_angle)
+
   for i in range(10000):
     positions.append(int(state[0] * FRAME_WIDTH))
     positions.append(int(state[1] * FRAME_HEIGHT))
-    if env.rocket_angle > 0.1:
+    if env.rocket_angle > math.pi/2:
       state, reward, done, _ = env.step((0.5, -0.1))
-      # print("turn up")
-    elif env.rocket_angle < 0:
-      state, reward, done, _ = env.step((0.0, 0.1))
-      # print("turn down")
+    elif env.rocket_angle < math.pi/2:
+      state, reward, done, _ = env.step((1, 0.1))
     else:
       state, reward, done, _ = env.step((1, 0))
-      # print("turn up")
-    print(env.rocket_angle, reward)
+
+    env.render()
     if done:
       print("Iter", i)
       print("Vel: ", env.rocket_vel_x, env.rocket_vel_y)
       print("Acc: ", env.acc_x, env.acc_y)
-      break 
+      break
 
 
-  window = MyWindow(FRAME_WIDTH, FRAME_HEIGHT)
-  window.update_points(positions)
-  window.set_planet(int(env.planet_x * FRAME_WIDTH), int(env.planet_y * FRAME_HEIGHT))
-  window.set_target(int(env.target_x * FRAME_WIDTH), int(env.target_y * FRAME_HEIGHT))
-  print(int(env.planet_x * FRAME_WIDTH), int(env.planet_y * FRAME_HEIGHT))
-  pyglet.app.run()
-
-  

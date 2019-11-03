@@ -6,8 +6,6 @@ from gym.utils import seeding
 import random
 import math
 import pyglet
-
-from pyglet_test import MyWindow
 ####################
 FRAME_WIDTH = 1000
 FRAME_HEIGHT = 800
@@ -159,33 +157,32 @@ class SlingshotEnv(gym.Env):
   def close(self):
     pass
 
-
-env = SlingshotEnv()
-state = env.reset()
-positions = []
-print(state)
-print(env.rocket_angle)
-for i in range(10000):
-  positions.append(int(state[0] * FRAME_WIDTH))
-  positions.append(int(state[1] * FRAME_HEIGHT))
-  if env.rocket_angle > 0.1:
-    state, reward, done, _ = env.step((0.5, -0.1))
-    # print("turn up")
-  elif env.rocket_angle < 0:
-    state, reward, done, _ = env.step((0.0, 0.1))
-    # print("turn down")
-  else:
-    state, reward, done, _ = env.step((1, 0))
-    # print("turn up")
-  print(env.rocket_angle, reward)
-  if done:
-    print("Iter", i)
-    print("Vel: ", env.rocket_vel_x, env.rocket_vel_y)
-    print("Acc: ", env.acc_x, env.acc_y)
-    break 
-
-
 if __name__ == '__main__':
+  env = SlingshotEnv()
+  state = env.reset()
+  positions = []
+  print(state)
+  print(env.rocket_angle)
+  for i in range(10000):
+    positions.append(int(state[0] * FRAME_WIDTH))
+    positions.append(int(state[1] * FRAME_HEIGHT))
+    if env.rocket_angle > 0.1:
+      state, reward, done, _ = env.step((0.5, -0.1))
+      # print("turn up")
+    elif env.rocket_angle < 0:
+      state, reward, done, _ = env.step((0.0, 0.1))
+      # print("turn down")
+    else:
+      state, reward, done, _ = env.step((1, 0))
+      # print("turn up")
+    print(env.rocket_angle, reward)
+    if done:
+      print("Iter", i)
+      print("Vel: ", env.rocket_vel_x, env.rocket_vel_y)
+      print("Acc: ", env.acc_x, env.acc_y)
+      break 
+
+
   window = MyWindow(FRAME_WIDTH, FRAME_HEIGHT)
   window.update_points(positions)
   window.set_planet(int(env.planet_x * FRAME_WIDTH), int(env.planet_y * FRAME_HEIGHT))

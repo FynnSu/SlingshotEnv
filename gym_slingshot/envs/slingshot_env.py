@@ -6,6 +6,8 @@ from gym.utils import seeding
 import random
 import math
 import pyglet
+
+from .pyglet_test import MyWindow
 ####################
 FRAME_WIDTH = 1000
 FRAME_HEIGHT = 800

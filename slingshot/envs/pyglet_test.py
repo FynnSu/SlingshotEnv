@@ -5,7 +5,7 @@ import pyglet
 class MyWindow(pyglet.window.Window):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    glClearColor(1, 1, 1, 1)
+    glClearColor(0, 0, 0, 1)
     self.vertex_list = pyglet.graphics.vertex_list(0, ('v2i', ()))
     self.planet = pyglet.graphics.vertex_list(0, ('v2i', ()))
     self.circle = pyglet.graphics.vertex_list(0, ('v2i', ()))
@@ -38,7 +38,7 @@ class MyWindow(pyglet.window.Window):
   
   
   def on_draw(self):
-    # self.clear()
+    self.clear()
     # vertex_list = pyglet.graphics.vertex_list(2, ('v2i', (10, 15, 30, 35)), ('c3B', (0, 255, 0, 255, 0, 0)))
     self.vertex_list.draw(GL_LINES)
     # self.planet.draw(pyglet.gl.GL_POINTS)
@@ -48,3 +48,28 @@ class MyWindow(pyglet.window.Window):
 if __name__ == '__main__':
   window = MyWindow(100, 100, "Test")
   pyglet.app.run()
+
+# import pyglet
+# import resources
+#
+# game_window = pyglet.window.Window()
+#
+# player = pyglet.sprite.Sprite(resources.player, x=100, y=100)
+# player_x = 0
+# player_y = 0
+#
+#
+# @game_window.event
+# def on_draw():
+#     game_window.clear()
+#     player.draw()
+#
+# def update(x):
+#     player.scale = 0.5
+#     player.rotation += 5
+#     player.x += 1
+#
+# if __name__ == '__main__':
+#
+#     pyglet.clock.schedule_interval(update, 0.01)
+#     pyglet.app.run()

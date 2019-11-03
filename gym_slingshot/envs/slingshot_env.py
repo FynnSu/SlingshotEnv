@@ -8,15 +8,16 @@ import math
 import pyglet
 from pyglet.gl import *
 import time
-from pyglet_test import MyWindow
-from newpyglet import main
+# from .pyglet_test import MyWindow
+from .newpyglet import main
 ####################
 FRAME_WIDTH = 1000
 FRAME_HEIGHT = 800
 # ROCKET_SPAWN_BOUNDARY_X = 0.1
 ROCKET_SPAWN_BOUNDARY_Y_TOP = 0.8
 ROCKET_SPAWN_BOUNDARY_Y_BOT = 0.2
-TARGET_SPAWN_BOUNDARY_X = 0.9
+TARGET_SPAWN_BOUNDARY_X_LEFT = 0.8
+TARGET_SPAWN_BOUNDARY_X_RIGHT = 0.97
 PLANET_SPAWN_BOUNDARY_X_LEFT = 0.35
 PLANET_SPAWN_BOUNDARY_X_RIGHT = 0.75
 PLANET_SPAWN_BOUNDARY_Y_TOP = 0.8
@@ -33,7 +34,7 @@ ROCKET_ROT_ANGLE = math.pi / 6
 
 NO_TOUCHING_ZONE_RADIUS = 0.05
 
-FUEL_COST = -1
+FUEL_COST = 0
 TURN_COST = -0.1
 
 STEP_DURATION = 3600  # Seconds / tick
@@ -52,7 +53,6 @@ class SlingshotEnv(gym.Env):
       """
       self.reset()
       self.x = main(FRAME_WIDTH, FRAME_HEIGHT)
-      self.positions = []
 
   def step(self, action):
     """
@@ -65,7 +65,7 @@ class SlingshotEnv(gym.Env):
     ------------
     (observations, reward, done, info)
     observations (tuple) :
-        (rocket_x, rocket_y, rocket_vel_x, rocket_vel_y
+        (rocket_x, rocket_y, rocket_angle, rocket_vel_x, rocket_vel_y
         planet_x, planet_y, planet_m, target_x, target_y)
 
     reward (float) :
@@ -80,12 +80,15 @@ class SlingshotEnv(gym.Env):
 
     """
     self.update_position(action)
+    self.last_action = action
     done = self.is_done()
     reward = self.calculate_reward(action, done)
     distance = math.sqrt((self.target_x - self.rocket_x)**2 + (self.target_y - self.rocket_y)**2) 
     if distance < self.min_distance:
       self.min_distance = distance
     
+    self.planet_x += self.planet_vel_x
+
     return self.get_obs(), reward, done, dict()
 
   def update_position(self, action):
@@ -111,24 +114,31 @@ class SlingshotEnv(gym.Env):
     self.rocket_vel_x = self.rocket_vel_x + a_x * STEP_DURATION / SPEED_FACTOR
     self.rocket_vel_y = self.rocket_vel_y + a_y * STEP_DURATION / SPEED_FACTOR
     self.rocket_angle = final_angle
+    if self.rocket_angle > math.pi:
+      self.rocket_angle -= 2 * math.pi
+    elif self.rocket_angle < - math.pi:
+      self.rocket_angle += 2 * math.pi
     self.acc_x = a_x
     self.acc_y = a_y
 
   def get_obs(self):
-    return (self.rocket_x, self.rocket_y, self.rocket_vel_x, 
-            self.rocket_vel_y, self.planet_x, self.planet_y, self.planet_m,
+    return (self.rocket_x, self.rocket_y, self.rocket_angle, self.rocket_vel_x, 
+            self.rocket_vel_y, self.planet_x, self.planet_y, (self.planet_m - PLANET_MIN_MASS) / (PLANET_MAX_MASS - PLANET_MIN_MASS),
             self.target_x, self.target_y)
 
+  def in_no_touching_zone(self):
+    return math.sqrt((self.rocket_x - self.planet_x) ** 2 + (self.rocket_y - self.planet_y)**2) < NO_TOUCHING_ZONE_RADIUS 
+
   def is_done(self):
-    radius_planet = math.sqrt((self.rocket_x - self.planet_x) ** 2 + (self.rocket_y - self.planet_y)**2)
+    # radius_planet = math.sqrt((self.rocket_x - self.planet_x) ** 2 + (self.rocket_y - self.planet_y)**2)
     if self.rocket_x > 1 or self.rocket_x < 0:
       return True
     elif self.rocket_y > 1 or self.rocket_y < 0:
       return True
     elif self.time_step > MAX_STEPS:
       return True
-    elif radius_planet < NO_TOUCHING_ZONE_RADIUS:
-      print("Entered No touching zone")
+    elif self.in_no_touching_zone():
+      # print("Entered No touching zone")
       return True
     else:
       return False
@@ -136,24 +146,30 @@ class SlingshotEnv(gym.Env):
   def calculate_reward(self, actions, done):
     reward = abs(actions[0]) * FUEL_COST + abs(actions[1]) * TURN_COST
 
-    if done:
-      reward += 200/(1+100*self.min_distance) - 2
+    distance = math.sqrt((self.target_x - self.rocket_x)**2 + (self.target_y - self.rocket_y)**2) 
+    if self.in_no_touching_zone():
+      reward -= 200
+    elif done:
+      reward += 1000/(1+100*distance) - 2
     return reward
 
   def reset(self):
-    self.target_x = random.uniform(TARGET_SPAWN_BOUNDARY_X, 1)
-    self.target_y = random.uniform(0, 1)
-    self.planet_x = random.uniform(PLANET_SPAWN_BOUNDARY_X_LEFT, PLANET_SPAWN_BOUNDARY_X_RIGHT)
-    self.planet_y = random.uniform(PLANET_SPAWN_BOUNDARY_Y_BOT, PLANET_SPAWN_BOUNDARY_Y_TOP)
-    self.planet_m = random.uniform(PLANET_MIN_MASS, PLANET_MAX_MASS)
+    self.target_x = 0.05 # random.uniform(TARGET_SPAWN_BOUNDARY_X_LEFT, TARGET_SPAWN_BOUNDARY_X_RIGHT)
+    self.target_y = 0.9 # random.uniform(0, 1)
+    self.planet_x = 0.7 # random.uniform(PLANET_SPAWN_BOUNDARY_X_LEFT, PLANET_SPAWN_BOUNDARY_X_RIGHT)
+    self.planet_y = 0.5 # random.uniform(PLANET_SPAWN_BOUNDARY_Y_BOT, PLANET_SPAWN_BOUNDARY_Y_TOP)
+    self.planet_m = PLANET_MAX_MASS # random.uniform(PLANET_MIN_MASS, PLANET_MAX_MASS)
+    self.planet_vel_x = -0.001
     self.rocket_x = 0.0
-    self.rocket_y = random.uniform(ROCKET_SPAWN_BOUNDARY_Y_BOT, ROCKET_SPAWN_BOUNDARY_Y_TOP)
-    speed = random.uniform(0, MAX_INIT_SPEED)
-    self.rocket_angle = random.uniform(-MAX_INIT_ANGLE, MAX_INIT_ANGLE)
+    self.rocket_y = 0.8 # random.uniform(ROCKET_SPAWN_BOUNDARY_Y_BOT, ROCKET_SPAWN_BOUNDARY_Y_TOP)
+    speed = MAX_INIT_SPEED # random.uniform(0, MAX_INIT_SPEED)
+    self.rocket_angle = - math.pi / 3 # random.uniform(-MAX_INIT_ANGLE, MAX_INIT_ANGLE)
     self.rocket_vel_x = speed * math.cos(self.rocket_angle)
     self.rocket_vel_y = speed * math.sin(self.rocket_angle)
     self.min_distance = math.sqrt((self.target_x - self.rocket_x) ** 2 + (self.target_y - self.target_y) ** 2)
     self.time_step = 0
+    self.last_action = (0, 0)
+    self.positions = []
     return self.get_obs()
 
   def render(self, mode='human'):
@@ -161,7 +177,7 @@ class SlingshotEnv(gym.Env):
     self.positions.append(int(self.rocket_y*FRAME_HEIGHT))
     self.x.render(self.positions[-2], self.positions[-1], self.rocket_angle, self.planet_x * FRAME_WIDTH,
                   self.planet_y * FRAME_HEIGHT, self.target_x * FRAME_WIDTH, self.target_y * FRAME_HEIGHT,
-                  self.positions, 1)
+                  self.positions, self.last_action[0])
     event = self.x.dispatch_events()
 
   def close(self):

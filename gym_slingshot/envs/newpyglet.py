@@ -1,17 +1,19 @@
 import pyglet
 import math
 from pyglet.gl import *
+import os
+
 
 class main(pyglet.window.Window):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         glClearColor(0, 0, 0, 1)
-
+        print(os.getcwd())
         self.x, self.y = 0, 0
-        rocket = pyglet.image.load('rocket.png')
-        planet = pyglet.image.load('planet.png')
-        target = pyglet.image.load('deathstar.png')
-        flame = pyglet.image.load('flame.png')
+        rocket = pyglet.image.load(os.path.join(os.path.dirname(__file__), 'rocket.png'))
+        planet = pyglet.image.load(os.path.join(os.path.dirname(__file__), 'planet.png'))
+        target = pyglet.image.load(os.path.join(os.path.dirname(__file__), 'deathstar.png'))
+        flame = pyglet.image.load(os.path.join(os.path.dirname(__file__), 'flame.png'))
         rocket.anchor_x = rocket.width // 2
         rocket.anchor_y = rocket.height // 2
         planet.anchor_x = planet.width // 2
